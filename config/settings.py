@@ -20,19 +20,26 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get("SECRET_KEY")
+SECRET_KEY = "django-insecure-r%#tkpfe@y!%k^k_pi6sr#lc(2pbf8rx8i0kk@zv+r7qt^^sy%"
+# SECRET_KEY = os.environ.get("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = bool(int(os.environ.get("DEBUG")))
 
-ALLOWED_HOSTS = ["localhost:3000", "127.0.0.1", os.environ.get("HOST"), os.environ.get("ALLOWED_HOST")]
+DEBUG = True
+    # bool(int(os.environ.get("DEBUG")))
 
-CORS_ALLOWED_ORIGINS = ["http://localhost:3000", os.environ.get("ALLOWED_ORIGIN")]
+ALLOWED_HOSTS = ["localhost:3000", "127.0.0.1", "api.localhost"]
+# ALLOWED_HOSTS = ["localhost:3000", "127.0.0.1", os.environ.get("HOST"), os.environ.get("ALLOWED_HOST")]
+
+CORS_ALLOWED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+# CORS_ALLOWED_ORIGINS = ["http://localhost:3000", os.environ.get("ALLOWED_ORIGIN")]
+
+CORS_ALLOW_CREDENTIALS = True
 
 REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
-        # 'rest_framework.renderers.BrowsableAPIRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
@@ -59,6 +66,7 @@ INSTALLED_APPS = [
     'corsheaders',
     # my apps
     'app_sudoku',
+    'app_tic_tac_toe',
     'users',
 ]
 
@@ -68,6 +76,7 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+    'corsheaders.middleware.CorsPostCsrfMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -97,14 +106,32 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 DATABASES = {
+    # 'default': {
+    #     'ENGINE': 'django.db.backends.postgresql',
+    #     'NAME': os.environ.get("DB_NAME"),
+    #     'USER': os.environ.get("DB_USER"),
+    #     'PASSWORD': os.environ.get("DB_PASSWORD"),
+    #     'HOST': os.environ.get("DB_HOST"),
+    #     'PORT': os.environ.get("DB_PORT"),
+    # }
+
+    # delete below for deploy
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get("DB_NAME"),
-        'USER': os.environ.get("DB_USER"),
-        'PASSWORD': os.environ.get("DB_PASSWORD"),
-        'HOST': os.environ.get("DB_HOST"),
-        'PORT': os.environ.get("DB_PORT"),
+        'NAME': "game_db",
+        'USER': "game_user",
+        'PASSWORD': "1234",
+        'HOST': "127.0.0.1",
+        'PORT': "5432",
     }
+    # 'default': {
+    #     'ENGINE': 'django.db.backends.postgresql',
+    #     'NAME': "railway",
+    #     'USER': "postgres",
+    #     'PASSWORD': "K8Q3BEcoEzLwre4DN58U",
+    #     'HOST': "containers-us-west-126.railway.app",
+    #     'PORT': "6178",
+    # }
 }
 
 # Password validation

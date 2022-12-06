@@ -7,35 +7,7 @@ from rest_framework.exceptions import MethodNotAllowed
 from .models import TicTacToeGameModel
 
 
-class TicTacToeGame:
-    game_name = "tic-tac-toe"
-    player_prefix = "player%s"
-    model = TicTacToeGameModel
-    required_cookies = ("game", "game_id", "player", "your_turn", "requests_count")
-    cookies_max_age = 600
-    cookies_httpOnly = True
-
-    def init_game(self):
-        self.cookies = self._get_cookies()
-        if self.cookies["game"] == self.game_name:
-            self.game = self.model.objects.get(id=self.cookies["game_id"])
-            self.player = int(self.cookies["player"].strip()[-1])
-            self.your_turn = self._get_queue()
-            self._requests_count()
-        elif self.request.method in ("POST", "GET"):
-            pass
-        else:
-            raise MethodNotAllowed(method=self.request.method)
-
-    def _requests_count(self):
-        if self.request.method == "GET":
-            self.cookies["requests_count"] = str(int(self.cookies["requests_count"]) + 1)
-            # delete game if requests more then max_requests_number
-        else:
-            self.cookies["requests_count"] = "0"
-
-    # ___create game___
-
+class CreateGame:
     @classmethod
     def create_game(cls):
         empty_square = {"1": "", "2": "", "3": "", "4": "", "5": "", "6": "", "7": "", "8": "", "9": ""}
@@ -51,7 +23,7 @@ class TicTacToeGame:
     @classmethod
     def _base_response(cls, game):
         """Creates and returns response with cookies for just created game"""
-        response = Response(data=game.play_square, status=status.HTTP_201_CREATED)
+        response = Response(data={"play_square": game.play_square}, status=status.HTTP_201_CREATED)
         cookies = {"game": cls.game_name, "game_id": str(game.id), "requests_count": "0"}
         if game.started:
             cookies["player"] = cls.player_prefix % "2"
@@ -64,8 +36,8 @@ class TicTacToeGame:
             response.set_cookie(key, value, max_age=cls.cookies_max_age, httponly=cls.cookies_httpOnly)
         return response
 
-    # __update game___
 
+class UpdateGame:
     def set_value(self, cell):
         if self._check_before_set_val_in_square(cell):
             self._set_value_in_square(cell)
@@ -127,7 +99,8 @@ class TicTacToeGame:
             )
 
         for key, value in self.cookies.items():
-            response.set_cookie(key=key, value=value, max_age=self.cookies_max_age, httponly=self.cookies_httpOnly)
+            response.set_cookie(key=key, value=value,
+                                max_age=self.cookies_max_age, httponly=self.cookies_httpOnly, samesite="None")
         return response
 
     def _check_winner(self):
@@ -150,6 +123,39 @@ class TicTacToeGame:
                 self.game.save()
                 return True
         return False
+
+
+class DeleteGame:
+    pass
+
+
+class TicTacToeGame(CreateGame, UpdateGame, DeleteGame):
+    game_name = "tic-tac-toe"
+    player_prefix = "player%s"
+    model = TicTacToeGameModel
+    required_cookies = ("game", "game_id", "player", "your_turn", "requests_count")
+    cookies_max_age = 600
+    cookies_httpOnly = False
+
+    def init_game(self):
+        self.cookies = self._get_cookies()
+        if self.cookies["game"] == self.game_name:
+            self.game = self.model.objects.get(id=self.cookies["game_id"])
+            self.player = int(self.cookies["player"].strip()[-1])
+            self.your_turn = self._get_queue()
+            self._requests_count()
+        # elif self.request.method in ("POST", "GET"):
+        #     pass
+        # else:
+        #     raise MethodNotAllowed(method=self.request.method)
+
+    def _requests_count(self):
+        if self.request.method == "GET":
+            self.cookies["requests_count"] = str(int(self.cookies["requests_count"]) + 1)
+            # delete game if requests more then max_requests_number
+        else:
+            self.cookies["requests_count"] = "0"
+
 
 
 class TicTacToeView(TicTacToeGame, APIView):
