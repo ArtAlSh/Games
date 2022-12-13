@@ -23,14 +23,19 @@ class CreateGame:
     @classmethod
     def _base_response(cls, game):
         """Creates and returns response with cookies for just created game"""
-        response = Response(data={"play_square": game.play_square}, status=status.HTTP_201_CREATED)
         cookies = {"game": cls.game_name, "game_id": str(game.id), "requests_count": "0"}
         if game.started:
             cookies["player"] = cls.player_prefix % "2"
-            cookies["your_turn"] = "false"
+            cookies["your_turn"] = False
         else:
             cookies["player"] = cls.player_prefix % "1"
-            cookies["your_turn"] = "true"
+            cookies["your_turn"] = True
+
+        response = Response(
+            data={"play_square": game.play_square, "started": game.started,
+                  "your_turn": cookies["your_turn"], "winner": ""},
+            status=status.HTTP_201_CREATED
+        )
         # set cookies in response
         for key, value in cookies.items():
             response.set_cookie(key, value, max_age=cls.cookies_max_age, httponly=cls.cookies_httpOnly)
@@ -38,6 +43,7 @@ class CreateGame:
 
 
 class UpdateGame:
+
     def set_value(self, cell):
         if self._check_before_set_val_in_square(cell):
             self._set_value_in_square(cell)
@@ -53,7 +59,7 @@ class UpdateGame:
     def _check_before_set_val_in_square(self, cell):
         if not hasattr(self, "game"):
             return False
-        empty_cell = not self.game.play_square[cell]
+        empty_cell = not self.game.play_square[str(cell)]
         return self.game.started and self.your_turn and empty_cell
 
     def _set_value_in_square(self, cell):
@@ -78,50 +84,62 @@ class UpdateGame:
             cookies[value] = self.request.COOKIES.get(value)
         return cookies
 
-    def _response(self):
-        if self.game.finished:
-            print("lose player")
-            response = Response(
-                data={"play_square": self.game.play_square, "winner": "You are lose"},
-                status=status.HTTP_200_OK
-            )
-            self.game.delete()
-        elif self._check_winner():
-            print("lose player")
-            response = Response(
-                data={"play_square": self.game.play_square, "winner": "You are winn"},
-                status=status.HTTP_200_OK
-            )
-        else:
-            response = Response(
-                data={"play_square": self.game.play_square},
-                status=status.HTTP_202_ACCEPTED
-            )
+    def _delete_cookies(self, response):
+        some = {}
+        some.keys()
+        for key in self.cookies.keys():
+            response.delete_cookie(key=key)
+        return response
 
+    def _set_cookies(self, response):
         for key, value in self.cookies.items():
             response.set_cookie(key=key, value=value,
                                 max_age=self.cookies_max_age, httponly=self.cookies_httpOnly, samesite="None")
         return response
 
+    def _response(self):
+        check_winner = self._check_winner()
+        response = Response(
+                data={"play_square": self.game.play_square, "started": self.game.started, "your_turn": self._get_queue(), "winner": ""},
+                status=status.HTTP_200_OK
+        )
+        if check_winner:
+            winner = "You are winn." if (self.player == 1 and check_winner == "X") \
+                                       or (self.player == 2 and check_winner == "O") \
+                else "You are lose."
+            response.data["winner"] = winner
+            response = self._delete_cookies(response)
+        elif self._check_full_square():
+            response.data["winner"] = "Friendship is winn!"
+            response = self._delete_cookies(response)
+        else:
+            response = self._set_cookies(response)
+        return response
+
+    def _check_full_square(self):
+        if "" in self.game.play_square.values():
+            return False
+        return True
+
     def _check_winner(self):
         square = self.game.play_square
-        row1 = square["1"] == square["2"] == square["3"] != ""
-        row2 = square["4"] == square["5"] == square["6"] != ""
-        row3 = square["7"] == square["8"] == square["9"] != ""
+        row1 = square["1"] if square["1"] == square["2"] == square["3"] != "" else False
+        row2 = square["4"] if square["4"] == square["5"] == square["6"] != "" else False
+        row3 = square["7"] if square["7"] == square["8"] == square["9"] != "" else False
 
-        col1 = square["1"] == square["4"] == square["7"] != ""
-        col2 = square["2"] == square["5"] == square["8"] != ""
-        col3 = square["3"] == square["6"] == square["9"] != ""
+        col1 = square["1"] if square["1"] == square["4"] == square["7"] != "" else False
+        col2 = square["2"] if square["2"] == square["5"] == square["8"] != "" else False
+        col3 = square["3"] if square["3"] == square["6"] == square["9"] != "" else False
 
-        diag1 = square["1"] == square["5"] == square["9"] != ""
-        diag2 = square["3"] == square["5"] == square["7"] != ""
+        diag1 = square["1"] if square["1"] == square["5"] == square["9"] != "" else False
+        diag2 = square["3"] if square["3"] == square["5"] == square["7"] != "" else False
 
         check_list = [row1, row2, row3, col1, col2, col3, diag1, diag2]
         for check in check_list:
             if check:
                 self.game.finished = True
                 self.game.save()
-                return True
+                return check
         return False
 
 
@@ -135,19 +153,15 @@ class TicTacToeGame(CreateGame, UpdateGame, DeleteGame):
     model = TicTacToeGameModel
     required_cookies = ("game", "game_id", "player", "your_turn", "requests_count")
     cookies_max_age = 600
-    cookies_httpOnly = False
+    cookies_httpOnly = True
 
     def init_game(self):
         self.cookies = self._get_cookies()
-        if self.cookies["game"] == self.game_name:
+        if self.cookies["game"] == self.game_name and self.request.method in ("GET", "PUT", "DELETE"):
             self.game = self.model.objects.get(id=self.cookies["game_id"])
             self.player = int(self.cookies["player"].strip()[-1])
             self.your_turn = self._get_queue()
             self._requests_count()
-        # elif self.request.method in ("POST", "GET"):
-        #     pass
-        # else:
-        #     raise MethodNotAllowed(method=self.request.method)
 
     def _requests_count(self):
         if self.request.method == "GET":
@@ -155,7 +169,6 @@ class TicTacToeGame(CreateGame, UpdateGame, DeleteGame):
             # delete game if requests more then max_requests_number
         else:
             self.cookies["requests_count"] = "0"
-
 
 
 class TicTacToeView(TicTacToeGame, APIView):
@@ -167,10 +180,14 @@ class TicTacToeView(TicTacToeGame, APIView):
     def get(self, request):
         return self.get_game()
 
-    def post(self, request):
+    def post(self, request: HttpRequest):
         return self.create_game()
 
     def put(self, request: Request):
         if "cell" in request.data.keys():
             return self.set_value(request.data["cell"])
         return Response(data={"error": 'set a number if cell in format {"cell": "cell number"}'})
+
+    def delete(self, request: Request):
+        self.delete_game()
+        return Response(status=status.HTTP_205_RESET_CONTENT)

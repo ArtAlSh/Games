@@ -5,6 +5,8 @@ from rest_framework.response import Response
 from rest_framework.request import Request
 from rest_framework.authtoken.models import Token
 
+from django.http.request import HttpRequest
+
 from .serializers import UserSignUpSerializer
 from .models import SudokuStatisticModel
 
@@ -17,7 +19,7 @@ class SignUpView(generics.CreateAPIView):
 class LogInView(APIView):
     permission_classes = [permissions.AllowAny]
 
-    def post(self, request):
+    def post(self, request: Request):
         username = request.data.get("username")
         password = request.data.get("password")
         user = authenticate(request=request, username=username, password=password)

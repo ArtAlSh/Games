@@ -25,12 +25,10 @@ SECRET_KEY = os.environ.get("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 
 DEBUG = True if os.environ.get("DEBUG", False) == "True" else False
-    # bool(int(os.environ.get("DEBUG")))
 
 # ALLOWED_HOSTS = ["localhost:3000", "127.0.0.1", "localhost"]
 ALLOWED_HOSTS = ["localhost:3000", "127.0.0.1", os.environ.get("HOST"), os.environ.get("ALLOWED_HOST")]
 
-# CORS_ALLOWED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
 CORS_ALLOWED_ORIGINS = ["http://localhost:3000", os.environ.get("ALLOWED_ORIGIN")]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -38,7 +36,7 @@ CORS_ALLOW_CREDENTIALS = True
 REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer',
+        # 'rest_framework.renderers.BrowsableAPIRenderer',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
