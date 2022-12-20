@@ -26,7 +26,6 @@ SECRET_KEY = os.environ.get("SECRET_KEY")
 
 DEBUG = True if os.environ.get("DEBUG", False) == "True" else False
 
-# ALLOWED_HOSTS = ["localhost:3000", "127.0.0.1", "localhost"]
 ALLOWED_HOSTS = ["localhost:3000", "127.0.0.1", os.environ.get("HOST"), os.environ.get("ALLOWED_HOST")]
 
 CORS_ALLOWED_ORIGINS = ["http://localhost:3000", os.environ.get("ALLOWED_ORIGIN")]
