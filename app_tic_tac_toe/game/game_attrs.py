@@ -7,10 +7,18 @@ class GameCookies:
 
     def __get__(self, instance, owner):
         cookies = self._get_cookies(instance, owner)
-        if cookies["game"] == owner.game_name:
+        cookies.update(instance._extra_cookies)
+        if self.check_cookies(cookies, owner):
             return cookies
-        else:
-            return None
+        return None
+
+    def __set__(self, instance, value: dict):
+        for key, val in value.items():
+            if key in instance.required_cookies:
+                instance._extra_cookies[key] = val
+
+    def __delete__(self, instance):
+        instance._extra_cookies = {}
 
     @staticmethod
     def _get_cookies(instance, owner):
@@ -18,6 +26,15 @@ class GameCookies:
         for value in owner.required_cookies:
             cookies[value] = instance.request.COOKIES.get(value)
         return cookies
+
+    @staticmethod
+    def check_cookies(cookies, owner):
+        if cookies['game'] != owner.game_name: return False
+        if not cookies['game_id'].isnumeric(): return False
+        if cookies['player'] not in [owner.player_prefix % 1, owner.player_prefix % 2]: return False
+        if not cookies['requests_count'].isnumeric(): return False
+        if not (cookies['single'] == 'true' or cookies['single'] == 'false'): return False
+        return True
 
 
 class Game:
@@ -44,15 +61,19 @@ class Game:
     def _get_game(instance):
         """Returns game model if exist or None"""
         if instance.cookies:
-            game_id = instance.cookies["game_id"]
-            return instance.model.objects.get(id=game_id)
+            try:
+                game_id = int(instance.cookies["game_id"])
+                game = instance.model.objects.get(id=game_id)
+                return game
+            except:
+                return None
         else:
             return None
 
     @staticmethod
     def _check_before_set_value(instance, game, cell):
-        if not game:
-            return False
+        if not game: return False
+        if str(cell) not in game.play_square.keys(): return False
         empty_cell = not game.play_square[str(cell)]
         return game.started and instance.your_turn and empty_cell
 
@@ -71,11 +92,6 @@ class Game:
 
 class GameResponse:
 
-    def __init__(self, required_cookies, max_age, httponly):
-        self.required_cookies = required_cookies
-        self.cookies_max_age = max_age
-        self.cookies_httpOnly = httponly
-
     def __get__(self, instance, owner):
         if instance.game:
             return self._response(instance)
@@ -88,29 +104,23 @@ class GameResponse:
                   "your_turn": instance.your_turn, "winner": ""},
             status=status.HTTP_200_OK
         )
-        # check end game
-        check_winner = self._check_winner(square=instance.game.play_square)
-        check_full_square = self._check_full_square(square=instance.game.play_square)
-        # set specific data in request
-        if check_winner:
-            winner = "You are winn." if (instance.player == 1 and check_winner == "X") \
-                                        or (instance.player == 2 and check_winner == "O") \
-                else "You are lose."
-            response.data["winner"] = winner
+        response.data.update(instance.extra_data)
+        # check end of game
+        game_status = instance.game_status()
+        if game_status:
+            response.data["winner"] = game_status
             response = self._delete_cookies(response, instance.cookies)
-        elif check_full_square:
-            response.data["winner"] = "Friendship is winn!"
-            response = self._delete_cookies(response, instance.cookies)
-        else:
-            response = self._set_cookies(response, instance.cookies)
+            return response
+        response = self._set_cookies(instance, response)
         return response
 
-    def _set_cookies(self, response, required_cookies):
+    @staticmethod
+    def _set_cookies(instance, response):
         """Sets (updates) required cookies in request"""
-        for key, value in required_cookies.items():
+        for key, value in instance.cookies.items():
             response.set_cookie(key=key, value=value,
-                                max_age=self.cookies_max_age,
-                                httponly=self.cookies_httpOnly)
+                                max_age=instance.cookies_max_age,
+                                httponly=instance.cookies_httpOnly)
         return response
 
     @staticmethod
@@ -118,27 +128,6 @@ class GameResponse:
         for key in required_cookies.keys():
             response.delete_cookie(key=key)
         return response
-
-    @staticmethod
-    def _check_full_square(square):
-        if "" in square.values():
-            return False
-        return True
-
-    @staticmethod
-    def _check_winner(square):
-        # check rows
-        if square["1"] == square["2"] == square["3"] != "": return square["1"]
-        if square["4"] == square["5"] == square["6"] != "": return square["4"]
-        if square["7"] == square["8"] == square["9"] != "": return square["7"]
-        # check columns
-        if square["1"] == square["4"] == square["7"] != "": return square["1"]
-        if square["2"] == square["5"] == square["8"] != "": return square["2"]
-        if square["3"] == square["6"] == square["9"] != "": return square["3"]
-        # check diagonals
-        if square["1"] == square["5"] == square["9"] != "": return square["1"]
-        if square["3"] == square["5"] == square["7"] != "": return square["3"]
-        return False
 
 
 __all__ = [Game, GameCookies, GameResponse]
